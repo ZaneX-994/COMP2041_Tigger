@@ -1,0 +1,52 @@
+#!/bin/dash
+
+# get the name of current branch
+directory=".tigger"
+
+# exit if repository is not created
+if [ ! -d "$directory" ]
+then
+    echo "$0: error: tigger repository directory .tigger not found"
+    exit 1
+elif [ "$#" -eq 0 ]
+then
+# exit if no file is given
+    echo "usage: tigger-add <filenames>"
+    exit 1
+fi
+
+branch=$(cat "$directory"/branchname)
+branch="$directory/$branch"
+
+# check all files are regular file
+for file in "$@"
+do
+    if [ -d "$file" ]
+    then
+        echo "tigger-add: error: '$file' is not a regular file"
+        exit 1
+    elif [ ! -f "$file" ] && [ ! -f "$branch/$file" ]
+    then
+        echo "tigger-add: error: can not open '$file'"
+        exit 1
+    elif [ ! -f "$file" ] && [ -f "$branch/$file" ]
+    then
+        rm "$branch/$file"
+        # touch "$branch"/index
+        exit 0
+    fi 
+done
+
+# add all files
+for file in "$@"
+do  
+    # if regular file exists in current branch and not modified
+    if [ -f "$branch/$file" ] && (diff "$file" "$branch/$file" >/dev/null)
+    then
+        continue
+    else
+    # if regular file modified or not exists in current branch
+        # echo "$file" >> "$branch"/index
+        cp -f "$file" "$branch"
+    fi
+done

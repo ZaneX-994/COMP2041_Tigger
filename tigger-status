@@ -1,0 +1,205 @@
+#!/bin/dash
+
+# get the name of current branch
+directory=".tigger"
+
+# exit if repository is not created
+if [ ! -d "$directory" ]
+then
+    echo "$0: error: tigger repository directory .tigger not found"
+    exit 1
+fi
+
+branch=$(cat "$directory"/branchname)
+branch="$directory/$branch"
+
+latestCommit=""
+
+temp=$(mktemp)
+
+# if there's commit records get the latest commit
+# otherwise loopthrough index and local file 
+if [ -f "$branch/commits" ]
+then
+    latestCommit=$(tail -1 "$branch/commits" | cut -d':' -f1)
+else
+    for file in "$branch"/*
+    do
+        filename=$(basename "$file")
+        if [ "$filename" = "commits" ] || [ "$filename" = "*" ]
+        then
+            continue
+        fi
+        if [ ! -f "$filename" ]
+        then
+            echo "$filename - added to index, file deleted" >> "$temp"
+        elif ! diff "$filename" "$file" > /dev/null
+        then
+            echo "$filename - added to index, file changed" >> "$temp"
+        else
+            echo "$filename - added to index"  >> "$temp"
+        fi
+    done
+
+    for file in *
+    do
+        if [ ! -f "$branch/$file" ]
+        then
+            echo "$file - untracked" >> "$temp"
+        elif ! diff "$file" "$branch/$file" > /dev/null
+        then
+            echo "$file - added to index, file changed" >> "$temp"
+        else
+            echo "$filename - added to index"  >> "$temp"
+        fi
+    done
+    sort "$temp" | uniq
+    exit 0
+fi
+
+# loop through most recent commit and compare it to index and local ones (if exists)
+for file in "$branch/commit$latestCommit"/*
+do  
+    filename=$(basename "$file")
+    if [ "$filename" = "commits" ] || [ ! -f "$file" ]
+    then
+        continue
+    fi
+    if [ -f "$branch/$filename" ] && [ -f "$filename" ]
+    then
+        if diff "$branch/$filename" "$filename" > /dev/null && diff "$filename" "$file" > /dev/null
+        then    
+            echo "$filename - same as repo" >> "$temp"
+        elif diff "$branch/$filename" "$filename" > /dev/null && ! diff "$filename" "$file" > /dev/null
+        then
+            echo "$filename - file changed, changes staged for commit" >> "$temp"
+        elif ! diff "$branch/$filename" "$filename" > /dev/null && diff "$branch/$filename" "$file" > /dev/null
+        then
+            echo "$filename - file changed, changes not staged for commit" >> "$temp"
+        else
+            echo "$filename - file changed, different changes staged for commit" >> "$temp"
+        fi
+
+    elif [ -f "$branch/$filename" ] && [ ! -f "$filename" ]
+    then
+        if diff "$branch/$filename" "$file" > /dev/null
+        then
+            echo "$filename - file deleted" >> "$temp"
+        else
+            echo "$filename - file deleted, different changes staged for commit" >> "$temp"
+        fi
+    elif [ ! -f "$branch/$filename" ] && [ -f "$filename" ]
+    then
+        echo "$filename - untracked" >> "$temp"
+    else
+        echo "$filename - deleted" >> "$temp"
+    fi
+done
+
+# loop through index files and compare it to commited and local ones (if exists)
+
+for file in "$branch"/*
+do  
+    
+    filename=$(basename "$file")
+    commitfile="$branch/commit$latestCommit/$filename"
+
+    if grep -E "$filename - " "$temp" > /dev/null
+    then
+        continue
+    fi
+
+    if [ "$filename" = "commits" ] || [ ! -f "$file" ]
+    then
+        continue
+    fi
+
+    if [ -f "$commitfile" ] && [ -f "$filename" ]
+    then
+        if diff "$commitfile" "$filename" > /dev/null && diff "$filename" "$file" > /dev/null
+        then    
+            echo "$filename - same as repo" >> "$temp"
+        elif diff "$file" "$filename" > /dev/null&& ! diff "$commitfile" "$file" > /dev/null
+        then
+            echo "$filename - file changed, changes staged for commit" >> "$temp"
+        elif ! diff "$filename" "$file" > /dev/null && diff "$commitfile" "$file" > /dev/null
+        then
+            echo "$filename - file changed, changes not staged for commit" >> "$temp"
+        else
+            echo "$filename - file changed, different changes staged for commit" >> "$temp"
+        fi
+
+    elif [ -f "$commitfile" ] && [ ! -f "$filename" ]
+    then
+        if diff "$commitfile" "$file" > /dev/null
+        then
+            echo "$filename - file deleted" >> "$temp"
+        else
+            echo "$filename - file deleted, different changes staged for commit" >> "$temp"
+        fi
+    elif [ ! -f "$commitfile" ] && [ -f "$filename" ]
+    then
+        if diff "$filename" "$file" > /dev/null
+        then
+            echo "$filename - added to index" >> "$temp"
+        else
+            echo "$filename - added to index, file changed" >> "$temp"
+        fi
+    else
+        echo "$filename - added to index, file deleted" >> "$temp"
+    fi
+done
+
+# loop through local files and compare it to commited and index ones (if exists)
+
+for file in *
+do  
+    addedfile="$branch/$file"
+    commitfile="$branch/commit$latestCommit/$filename"
+    
+    if grep -E "$file - " "$temp" > /dev/null
+    then
+        continue
+    fi
+
+    if [ ! -f "$file" ]
+    then
+        continue
+    fi
+
+    if [ -f "$commitfile" ] && [ -f "$addedfile" ]
+    then
+        if diff "$commitfile" "$addedfile" > /dev/null && diff "$addedfile" "$file" > /dev/null
+        then    
+            echo "$file - same as repo" >> "$temp"
+        elif diff "$addedfile" "$file" > /dev/null&& ! diff "$commitfile" "$file" > /dev/null
+        then
+            echo "$file - file changed, changes staged for commit" >> "$temp"
+        elif ! diff "$addedfile" "$file" > /dev/null && diff "$commitfile" "$addedfile" > /dev/null
+        then
+            echo "$file - file changed, changes not staged for commit" >> "$temp"
+        else
+            echo "$file - file changed, different changes staged for commit" >> "$temp"
+        fi
+
+    elif [ -f "$commitfile" ] && [ ! -f "$filename" ]
+    then
+        echo "$file - untracked" >> "$temp"
+        
+    elif [ ! -f "$commitfile" ] && [ -f "$addedfile" ]
+    then
+        if diff "$addedfile" "$file" > /dev/null
+        then
+            echo "$file - added to index" >> "$temp"
+        else
+            echo "$file - added to index, file changed" >> "$temp"
+        fi
+    else
+
+        echo "$file - untracked" >> "$temp"
+    fi
+done
+
+sort "$temp" | uniq
+
+

@@ -1,0 +1,86 @@
+#!/bin/dash
+
+# get the name of current branch
+directory=".tigger"
+
+# exit if repository is not created
+if [ ! -d "$directory" ]
+then
+    echo "$0: error: tigger repository directory .tigger not found"
+    exit 1
+fi
+
+branch=$(cat "$directory"/branchname)
+branch="$directory/$branch"
+
+if [ ! -f "$branch/commits" ]
+then
+    echo "tigger-branch: error: this command can not be run until after the first commit"
+    exit 1
+fi
+
+# check if command is valid first
+# if it is make a new directory representing new branch
+if [ "$#" -eq 0 ]
+then
+    for branch in "$directory"/*
+    do  
+        branchname=$(basename "$branch")
+        if [ -d "$branch" ]
+        then
+            echo "$branchname"
+        fi
+    done
+elif [ "$1" = '-d' ] && [ "$#" -eq 2 ]
+then
+    if [ ! -d "$directory/$2" ]
+    then
+        echo "tigger-branch: error: branch '$2' doesn't exist"
+        exit 1
+    elif [ "$2" = 'master' ]
+    then
+        echo "tigger-branch: error: can not delete branch 'master'"
+        exit 1
+    else
+        echo "Deleted branch '$2'"
+        rm -r "${directory:?}/$2"
+        exit 0
+    fi
+elif [ "$1" != '-d' ] && [ "$#" -eq 1 ]
+then
+    if [ -d "$directory/$1" ]
+    then
+        echo "tigger-branch: error: branch '$1' already exists"
+        exit 1
+    fi
+
+    mkdir "$directory/$1"
+    mkdir "$directory/$1/backup"
+    # new branch has everything in current branch at this point
+    for file in "$branch"/*
+    do
+        if [ -f "$file" ]
+        then
+            cp "$file" "$directory/$1"
+            # cp "$file" "$branch/backup"
+        elif [ -d "$file" ]
+        then
+            cp -r "$file" "$directory/$1"
+            # cp -r "$file" "$branch/backup"
+        fi
+    done
+    # make a back up for new branch
+    for file in *
+    do
+        if [ -f "$file" ] 
+        then
+            case $file in
+                "tigger-"*) continue
+            esac
+            cp -p "$file" "$directory/$1/backup"
+        fi
+    done
+else
+    echo "usage: tigger-branch [-d] <branch>"
+    exit 1
+fi

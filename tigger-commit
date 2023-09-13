@@ -1,0 +1,100 @@
+#!/bin/dash
+
+# get the name of current branch
+directory=".tigger"
+branch=$(cat "$directory"/branchname)
+branch="$directory/$branch"
+# check if command is correct
+if [ ! -d "$directory" ]
+then
+    echo "$1: error: tigger repository directory .tigger not found"
+    exit 1
+elif [ "$1" != '-m' ] && [ "$1" != '-a' ] && [ "$1" != '-am' ]
+then
+    echo "usage: tigger-commit [-a] -m commit-message"
+    exit 1
+elif [ "$1" = '-m' ] && [ "$#" -ne 2 ]
+then
+    echo "usage: tigger-commit [-a] -m commit-message"
+    exit 1
+elif [ "$1" = '-a' ]  && [ "$#" -ne 3  ] && [ "$2" != '-m' ]
+then
+    echo "usage: tigger-commit [-a] -m commit-message"
+    exit 1
+elif [ "$1" = '-am' ] && [ "$#" -ne 2 ]
+then
+    echo "usage: tigger-commit [-a] -m commit-message"
+    exit 1
+fi
+
+# get commit message based on the command
+commitMSG="$2"
+
+if [ "$1" = '-a' ] || [ "$1" = '-am' ]
+then
+    commitMSG="$3"
+    for file in "$branch"/*
+    do
+        filename=$(basename "$file")
+        if [ -f "$file" ] && [ -f "$filename" ]
+        then
+            rm "$file"
+            tigger-add "$filename"
+        elif [ -f "$file" ] && [ ! -f "$filename" ] && [ "$filename" != "commits" ]
+        then
+            rm "$file"
+        fi
+    done
+fi
+
+# check if files are up to date if true exit
+latestCommit=""
+sameRepo=0
+if [ -f "$branch/commits" ]
+then
+    latestCommit=$(tail -1 "$branch/commits" | cut -d':' -f1)
+    for file in "$branch/commit$latestCommit/"*
+    do
+        filename=$(basename "$file")
+        if [ -f  "$branch/$filename" ] &&  ! diff "$branch/$filename" "$file" >/dev/null
+        then
+            sameRepo=1
+        elif [ ! -f "$branch/$filename" ]
+        then
+            sameRepo=1
+        fi
+    done
+
+    for file in "$branch"/*
+    do
+        filename=$(basename "$file")
+        if [ -f "$file" ] && [ ! -f "$branch/commit$latestCommit/$filename" ]
+        then
+            sameRepo=1
+        fi
+    done
+
+    if [ "$sameRepo" -eq 0 ]
+    then
+        echo "nothing to commit"
+        exit 0
+    fi
+fi
+
+commitNum=$(wc -l < ".tigger/totalcommits")
+commit="$branch/commit$commitNum"
+
+mkdir "$commit"
+echo "$commitNum:$commitMSG" >> "$branch"/commits
+branchname=$(cat "$directory"/branchname)
+echo "$commitNum:$commitMSG:$branchname" >> ".tigger/totalcommits"
+echo "Committed as commit $commitNum"
+# copy files in index
+for file in "$branch"/*
+do  
+    if [ -d "$file" ]
+    then
+        continue
+    fi
+    cp "$file" "$commit"
+done

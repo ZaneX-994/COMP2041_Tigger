@@ -1,0 +1,63 @@
+#!/bin/dash
+
+# get the name of current branch
+directory=".tigger"
+
+# exit if repository is not created
+if [ ! -d "$directory" ]
+then
+    echo "$0: error: tigger repository directory .tigger not found"
+    exit 1
+fi
+
+branchname=$(cat "$directory"/branchname)
+branch="$directory/$branchname"
+# check if command given is valid
+# if so change branch by changing the content in banchname file
+if [ ! -f "$branch/commits" ]
+then
+    echo "tigger-branch: error: this command can not be run until after the first commit"
+    exit 1
+elif [ "$#" -ne 1 ]
+then
+    echo "usage: tigger-checkout <branch>"
+    exit 1
+elif [ "$1" = "$branchname" ]
+then
+    echo "Already on '$1'"
+    exit 0
+elif [ ! -d "$directory/$1" ]
+then
+    echo "tigger-checkout: error: unknown branch '$1'"
+    exit 1
+else
+    echo "$1" > "$directory/branchname"
+    echo "Switched to branch '$1'"
+fi
+
+# make a backup for current branch （store all the files）
+if [ ! -d  "$branch/backup" ]
+then
+    mkdir "$branch/backup"
+fi
+
+for file in *
+do
+    if [ -f "$file" ] 
+    then
+        case $file in
+            "tigger-"*) continue
+        esac
+        mv "$file" "$branch/backup"
+    fi
+done
+# load fiels from the target branch's backup 
+for file in "$directory/$1/backup"/*
+do
+    if [ -f "$file" ]
+    then
+        mv "$file" .
+    fi
+done
+
+

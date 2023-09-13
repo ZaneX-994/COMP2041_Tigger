@@ -1,0 +1,14 @@
+#!/bin/dash
+
+directory=".tigger"
+if [ -e "$directory" ]
+then
+    echo "tigger-init: error: .tigger already exists"
+else
+    mkdir "$directory"
+    master=".tigger/master"
+    mkdir "$master"
+    touch ".tigger/totalcommits"
+    echo "master" > "$directory"/branchname
+    echo "Initialized empty tigger repository in .tigger"
+fi

@@ -1,0 +1,110 @@
+#!/bin/dash
+
+# get the name of current branch
+directory=".tigger"
+
+
+if [ ! -d "$directory" ]
+then
+    echo "$1: error: tigger repository directory .tigger not found"
+    exit 1
+fi
+
+branch=$(cat "$directory"/branchname)
+branch="$directory/$branch"
+
+# we can assume force and cached present in order
+force=0
+cached=0
+if echo "$@" | grep -Eq '\s?--force\s?'
+then
+    force=1
+fi
+
+if echo "$@" | grep -Eq '\s?--cached\s?' 
+then
+    cached=1
+fi
+
+files=$(echo "$@" | sed '
+                s/--force//
+                s/--cached//')
+# check files are valid
+for file in $files
+do
+    if [ ! -f "$branch/$file" ] 
+    then
+        echo "tigger-rm: error: '$file' is not in the tigger repository"
+        exit 1
+    fi
+done
+
+latestCommit=""
+
+if [ -f "$branch/commits" ]
+then
+    latestCommit=$(tail -1 "$branch/commits" | cut -d':' -f1)
+fi
+
+# for each file, check the removing situation (if they'are up-to-date, and should be removed or not)
+for file in $files
+do
+    if [ ! -f "$branch/$file" ] 
+    then
+        echo "tigger-rm: error: '$file' is not in the tigger repository"
+        exit 1
+    elif [ "$force" -eq 1 ] 
+    then
+            if [ "$cached" -eq 0 ]
+            then
+                rm "$file"
+            fi
+            rm "$branch/$file"
+    elif [ ! -f "$file" ]
+    then
+        rm "$branch/$file"
+    elif [ ! -f "$branch/commit$latestCommit/$file" ] && diff "$file" "$branch/$file" > /dev/null
+    then
+        if [ "$cached" -eq 1 ]
+        then
+            rm "$branch/$file"
+            continue
+        fi
+        echo "tigger-rm: error: '$file' has staged changes in the index"
+        exit 1
+
+    elif [ ! -f "$branch/commit$latestCommit/$file" ] && ! diff "$file" "$branch/$file" > /dev/null
+    then
+        echo "tigger-rm: error: '$file' in index is different to both the working file and the repository"
+        exit 1
+
+    elif ! diff "$branch/$file" "$branch/commit$latestCommit/$file" >/dev/null #[ "$cached" -eq 0 ]  && 
+    then
+
+        if ! diff "$file" "$branch/$file" >/dev/null
+        then
+            echo "tigger-rm: error: '$file' in index is different to both the working file and the repository"
+            exit 1
+        elif [ "$cached" -eq 0 ]
+        then
+        
+            echo "tigger-rm: error: '$file' has staged changes in the index"
+            exit 1
+        elif [ "$cached" -eq 1 ]
+        then
+            rm "$branch/$file"
+            # exit 0
+        fi
+    elif diff "$branch/$file" "$branch/commit$latestCommit/$file" >/dev/null #[ "$cached" -eq 0 ]  && 
+    then 
+        if [ "$cached" -eq 0 ] && ! diff "$file" "$branch/$file" >/dev/null
+        then
+            echo "tigger-rm: error: '$file' in the repository is different to the working file"
+            exit 1
+        elif [ "$cached" -eq 0 ]
+        then
+            rm "$file"
+        fi
+        rm "$branch/$file"
+    fi
+done

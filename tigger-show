@@ -1,0 +1,60 @@
+#!/bin/dash
+
+# get the name of current branch
+directory=".tigger"
+
+# exit if repository is not created or invalid command
+if [ ! -d "$directory" ]
+then
+    echo "$0: error: tigger repository directory .tigger not found"
+    exit 1
+elif [ "$#" -ne 1 ]
+then
+    echo "usage: $0 <commit>:<filename>"
+    exit 1
+elif ! echo "$1" | grep -Eq '^[0-9]*:.*$'
+then
+    echo "$0: error: invalid object $1"
+fi
+
+branch=$(cat "$directory"/branchname)
+branch="$directory/$branch"
+
+commitNum=$(echo "$1" | cut -d':' -f1)
+filename=$(echo "$1" | cut -d':' -f2)
+
+# check if file is in index if no commit number is given
+if [ "$commitNum" = "" ]
+then 
+    if [ -f "$branch/$filename" ]
+    then
+        cat "$branch/$filename"
+        exit 0
+    else
+        echo "tigger-show: error: '$filename' not found in index"
+        exit 1
+    fi
+    
+fi
+
+# search for commit num corresponding to given commit number 
+# if ! grep -Eq "$commitNum" "$branch"/commits || [ ! -f "$branch"/commits ]
+totalNum=$(wc -l < ".tigger/totalcommits")
+if [ "$commitNum" -ge "$totalNum" ]
+then
+    echo "tigger-show: error: unknown commit '$commitNum'"
+    exit 1
+fi
+
+# get file content
+commitBranch=$(grep -E "$commitNum:" ".tigger/totalcommits" | cut -d":" -f3)
+commitDirct="$directory/$commitBranch/commit$commitNum"
+name="$commitDirct/$filename"
+
+if [ -f "$name" ]
+then    
+    cat "$name"
+else
+    echo "$0: error: '$filename' not found in commit $commitNum"
+fi
+

@@ -1,0 +1,27 @@
+#!/bin/dash
+
+# get the name of current branch
+directory=".tigger"
+branch=$(cat "$directory"/branchname)
+branch="$directory/$branch"
+
+# exit if repository is not created or wrong command
+if [ ! -d "$directory" ]
+then
+    echo "$0: error: tigger repository directory .tigger not found"
+    exit 1
+elif [ "$#" -ne 0 ]
+then
+    echo "usage: tigger-log"
+    exit 1
+elif [ ! -f "$branch/commits" ]
+then
+    # no commit committed
+    echo -n ""
+    exit 0
+fi
+
+branch=$(cat "$directory"/branchname)
+branch="$directory/$branch"
+# cat "$branch"/commits | tr ':' ' ' | sort -nr
+tr ':' ' ' < "$branch"/commits | sort -nr
